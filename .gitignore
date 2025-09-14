@@ -10,7 +10,7 @@ venv/
 
 # Streamlit
 .streamlit/secrets.toml
-.streamlit/secrets.toml.*
+!.streamlit/secrets.toml.example
 .streamlit/cache/
 .streamlit/state/
 
