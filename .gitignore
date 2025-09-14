@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.db
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/secrets.toml.*
+.streamlit/cache/
+.streamlit/state/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# Sistemi operativi
+.DS_Store
+Thumbs.db
