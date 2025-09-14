@@ -55,7 +55,7 @@ def fetch_backtests(limit: int = 12, offset: int = 0) -> List[Dict[str, Any]]:
     """
     sb = get_client()
     res = (
-        sb.table("backtests_public_view")
+        sb.table("backtests_manifest")          # <— qui
         .select("code,image_url,performance_json,excel_url")
         .range(offset, offset + limit - 1)
         .execute()
