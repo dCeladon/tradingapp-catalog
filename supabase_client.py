@@ -47,17 +47,52 @@ def get_client() -> Client:
     url, key = _read_creds()
     return create_client(url, key)
 
-
 def fetch_backtests(limit: int = 12, offset: int = 0) -> List[Dict[str, Any]]:
     """
-    Legge dalla view/tabella pubblica (adatta il nome se necessario):
-      code, image_url, performance_json, excel_url
+    Legge SOLO i pubblicati da `backtests_manifest` (code, png_url, xlsx_url)
+    e arricchisce con `performance_json` leggendo da `backtests` tramite code.
     """
     sb = get_client()
-    res = (
-        sb.table("backtests_manifest")          # <— qui
-        .select("code,image_url,performance_json,excel_url")
+
+    # 1) Manifest = elenco pubblicati + asset pubblici
+    mres = (
+        sb.table("backtests_manifest")
+        .select("code,png_url,xlsx_url")
         .range(offset, offset + limit - 1)
         .execute()
     )
-    return res.data or []
+    manifest = mres.data or []
+
+    if not manifest:
+        return []
+
+    # 2) Completa con performance_json dalla tabella backtests, via code
+    codes = [row["code"] for row in manifest if "code" in row and row["code"]]
+    pres = (
+        sb.table("backtests")
+        .select("code,performance_json")
+        .in_("code", codes)
+        .execute()
+    )
+    perf_rows = pres.data or []
+    perf_map = {r["code"]: r.get("performance_json") for r in perf_rows}
+
+    # 3) Merge finale nel formato atteso dalla UI
+    items: List[Dict[str, Any]] = []
+    for r in manifest:
+        code = r.get("code")
+        items.append({
+            "code": code,
+            "image_url": r.get("png_url"),
+            "excel_url": r.get("xlsx_url"),
+            "performance_json": perf_map.get(code),  # può essere None se mancante
+        })
+
+    # (facoltativo) piccolo debug: mostra le colonne
+    try:
+        import streamlit as st
+        st.sidebar.caption("🧭 manifest cols: code,png_url,xlsx_url • backtests cols: code,performance_json")
+    except Exception:
+        pass
+
+    return items
