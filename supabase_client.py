@@ -1,47 +1,63 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Aug 25 16:22:34 2025
-
-@author: dinoc
-"""
-
 # supabase_client.py
-from supabase import create_client, Client
+from typing import List, Dict, Any
 import os
+import streamlit as st
+from supabase import create_client, Client
 
-def get_client() -> Client:
-    # prova prima dai secrets di Streamlit
+
+def _read_creds() -> tuple[str, str]:
+    """
+    Legge le credenziali da:
+    1) st.secrets["SUPABASE_URL"] / st.secrets["SUPABASE_ANON_KEY"]
+    2) st.secrets["supabase"]["url"] / st.secrets["supabase"]["anon_key"]
+    3) variabili d'ambiente SUPABASE_URL / SUPABASE_ANON_KEY
+    """
+    url = None
+    key = None
+
+    # 1) flat in secrets.toml
     try:
-        import streamlit as st
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_ANON_KEY"]
+        url = st.secrets.get("SUPABASE_URL")
+        key = st.secrets.get("SUPABASE_ANON_KEY")
     except Exception:
-        # fallback su variabili d'ambiente
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_ANON_KEY")
+        pass
+
+    # 2) sezione [supabase] in secrets.toml
+    if not url or not key:
+        try:
+            sub = st.secrets.get("supabase", {})
+            if isinstance(sub, dict):
+                url = url or sub.get("url")
+                key = key or sub.get("anon_key")
+        except Exception:
+            pass
+
+    # 3) variabili d’ambiente (fallback)
+    url = url or os.environ.get("SUPABASE_URL")
+    key = key or os.environ.get("SUPABASE_ANON_KEY")
 
     if not url or not key:
         raise RuntimeError("Mancano SUPABASE_URL / SUPABASE_ANON_KEY nei secrets.toml o env var.")
+
+    return url, key
+
+
+@st.cache_resource
+def get_client() -> Client:
+    url, key = _read_creds()
     return create_client(url, key)
 
-def count_published_backtests() -> int:
-    sb = get_client()
-    resp = (
-        sb.table("backtests")
-        .select("id", count="exact")   # prende solo il conteggio
-        .eq("published", True)
-        .limit(1)
-        .execute()
-    )
-    return int(resp.count or 0)
 
-def fetch_backtests(limit: int = 12, offset: int = 0):
+def fetch_backtests(limit: int = 12, offset: int = 0) -> List[Dict[str, Any]]:
+    """
+    Legge dalla view/tabella pubblica (adatta il nome se necessario):
+      code, image_url, performance_json, excel_url
+    """
     sb = get_client()
-    resp = (
-        sb.table("v_backtests_catalog")
-        .select("code, symbol, image_url, excel_url, performance_json, created_at")
-        .order("created_at", desc=True)
+    res = (
+        sb.table("backtests_public_view")
+        .select("code,image_url,performance_json,excel_url")
         .range(offset, offset + limit - 1)
         .execute()
     )
-    return resp.data or []
+    return res.data or []
