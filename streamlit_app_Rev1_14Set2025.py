@@ -151,10 +151,10 @@ PAGE_SIZE = 6 if mobile_mode else 12
 page = st.session_state.get("page", 1)
 left, mid, right = st.columns([1, 3, 1])
 with left:
-    if st.button("◀︎ Indietro", use_container_width=True, disabled=(page <= 1)):
+    if st.button("◀︎ Indietro", width="stretch", disabled=(page <= 1)):
         page = max(1, page - 1)
 with right:
-    if st.button("Avanti ▶︎", use_container_width=True):
+    if st.button("Avanti ▶︎", width="stretch"):
         page += 1
 st.session_state["page"] = page
 offset = (page - 1) * PAGE_SIZE
@@ -188,7 +188,7 @@ for r in range(rows):
             st.markdown(f"### {bt.get('code','')}")
             img_url = bt.get("image_url")
             if img_url:
-                st.image(img_url, use_container_width=True)
+                st.image(img_url, width="stretch")
             else:
                 st.info("Anteprima non disponibile per questo backtest.")
 
@@ -207,12 +207,12 @@ for r in range(rows):
             xlsx = bt.get("excel_url")  # già unito via view
             a, b = st.columns(2) if not mobile_mode else (st.container(), st.container())
             with a:
-                st.link_button("Apri Excel", xlsx, use_container_width=True)
+                st.link_button("Apri Excel", xlsx, width="stretch")
             with b:
                 st.link_button(
                     "Contattami",
                     "https://www.tailorcoding.com/contatti-tailor-coding",
-                    use_container_width=True
+                    width="stretch"
                 )
 
 st.divider()
