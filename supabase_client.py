@@ -1,5 +1,4 @@
-# supabase_client.py
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import os
 import streamlit as st
 from supabase import create_client, Client
@@ -47,6 +46,7 @@ def get_client() -> Client:
     url, key = _read_creds()
     return create_client(url, key)
 
+
 def fetch_backtests(limit: int = 12, offset: int = 0) -> List[Dict[str, Any]]:
     """
     Legge SOLO i pubblicati da `backtests_manifest` (code, png_url, xlsx_url)
@@ -88,11 +88,49 @@ def fetch_backtests(limit: int = 12, offset: int = 0) -> List[Dict[str, Any]]:
             "performance_json": perf_map.get(code),  # può essere None se mancante
         })
 
-    # (facoltativo) piccolo debug: mostra le colonne
-    try:
-        import streamlit as st
-        st.sidebar.caption("🧭 manifest cols: code,png_url,xlsx_url • backtests cols: code,performance_json")
-    except Exception:
-        pass
-
     return items
+
+
+def fetch_backtests_and_count(limit: int = 12, offset: int = 0) -> Tuple[List[Dict[str, Any]], int]:
+    """
+    Variante di fetch_backtests che restituisce anche il conteggio totale.
+    Usa count="exact" su backtests_manifest.
+    """
+    sb = get_client()
+
+    # 1) Manifest con count
+    mres = (
+        sb.table("backtests_manifest")
+        .select("code,png_url,xlsx_url", count="exact")
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+    manifest = mres.data or []
+    total = mres.count or 0
+
+    if not manifest:
+        return [], total
+
+    # 2) Performance_json
+    codes = [row["code"] for row in manifest if "code" in row and row["code"]]
+    pres = (
+        sb.table("backtests")
+        .select("code,performance_json")
+        .in_("code", codes)
+        .execute()
+    )
+    perf_rows = pres.data or []
+    perf_map = {r["code"]: r.get("performance_json") for r in perf_rows}
+
+    # 3) Merge finale
+    items: List[Dict[str, Any]] = []
+    for r in manifest:
+        code = r.get("code")
+        items.append({
+            "code": code,
+            "image_url": r.get("png_url"),
+            "excel_url": r.get("xlsx_url"),
+            "performance_json": perf_map.get(code),
+        })
+
+    return items, total
