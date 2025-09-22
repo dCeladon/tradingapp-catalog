@@ -5,7 +5,48 @@ import streamlit as st
 from typing import Any, Dict
 from supabase_client import fetch_backtests
 
-# ----------------- Helpers metriche -----------------
+# Inizializza la pagina se serve
+if "page" not in st.session_state:
+    st.session_state.page = 1
+
+def render_pagination_controls(total_pages: int, key_prefix: str = "top"):
+    """
+    Disegna pulsanti Indietro/Avanti sincronizzati usando st.session_state.page.
+    Richiama st.rerun() dopo un click per aggiornare subito la pagina.
+
+    Args:
+        total_pages: numero totale di pagine (>=1)
+        key_prefix: 'top' o 'bottom' per evitare collisioni di chiavi streamlit
+    """
+    page = int(st.session_state.page)
+    page = max(1, min(page, max(1, total_pages)))  # clamp di sicurezza
+    st.session_state.page = page
+
+    col_prev, col_info, col_next = st.columns([1, 2, 1])
+
+    with col_prev:
+        prev_clicked = st.button("◀ Indietro",
+                                 key=f"{key_prefix}_prev",
+                                 disabled=(page <= 1),
+                                 width="stretch")
+    with col_info:
+        st.markdown(
+            f"<div style='text-align:center; font-weight:600;'>Pagina {page} / {max(1,total_pages)}</div>",
+            unsafe_allow_html=True
+        )
+    with col_next:
+        next_clicked = st.button("Avanti ▶",
+                                 key=f"{key_prefix}_next",
+                                 disabled=(page >= max(1, total_pages)),
+                                 width="stretch")
+
+    if prev_clicked:
+        st.session_state.page = max(1, page - 1)
+        st.rerun()
+    if next_clicked:
+        st.session_state.page = min(max(1, total_pages), page + 1)
+        st.rerun()
+
 def _get_in(d: Dict[str, Any], *keys, default=None):
     """Safe get annidato: _get_in(perf, 'returns','net_profit_eur', default='—')."""
     cur = d
@@ -110,7 +151,7 @@ st.caption("Visualizza anteprime di backtest pubblicati. (Nessuna promessa di re
 
 # ========== NOVITÀ: Banner breve sempre visibile ==========
 st.warning(
-    "Contenuti informativi/educativi. Non sono consulenza o sollecitazione."
+    "Contenuti informativi/educativi. Non sono consulenza o sollecitazione. "
     "Le performance passate/simulate non garantiscono risultati futuri.",
     icon="⚠️",
 )
@@ -147,19 +188,16 @@ mobile_mode = st.toggle(
 COLS = 1 if mobile_mode else 3
 PAGE_SIZE = 6 if mobile_mode else 12
 
-# Paginazione
+# -------- Paginazione (TOP) --------
 page = st.session_state.get("page", 1)
-left, mid, right = st.columns([1, 3, 1])
-with left:
-    if st.button("◀︎ Indietro", width="stretch", disabled=(page <= 1)):
-        page = max(1, page - 1)
-with right:
-    if st.button("Avanti ▶︎", width="stretch"):
-        page += 1
-st.session_state["page"] = page
+# In alto non conosciamo ancora il totale; mostriamo almeno la pagina corrente
+render_pagination_controls(total_pages=max(1, page), key_prefix="top")
+
+# Calcolo offset dopo eventuali click
+page = st.session_state.get("page", 1)
 offset = (page - 1) * PAGE_SIZE
 
-# Fetch
+# -------- Fetch --------
 items = fetch_backtests(limit=PAGE_SIZE, offset=offset)
 
 if not items and page > 1:
@@ -167,7 +205,7 @@ if not items and page > 1:
     st.session_state["page"] = page - 1
     st.rerun()
 
-# Stile
+# -------- Stile / CSS --------
 st.markdown("""
 <style>
 /* Nascondi completamente la sidebar (scritte debug “manifest cols…”) */
@@ -181,9 +219,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
-# Render griglia
-rows = math.ceil(len(items) / COLS)
+# -------- Render griglia --------
+rows = math.ceil(len(items) / COLS) if items else 0
 for r in range(rows):
     cols = st.columns(COLS)
     for c in range(COLS):
@@ -221,6 +258,13 @@ for r in range(rows):
                     "https://www.tailorcoding.com/contatti-tailor-coding",
                     width="stretch"
                 )
+
+# -------- Paginazione (BOTTOM) --------
+# Se la pagina corrente ha meno item del PAGE_SIZE, siamo all’ultima
+page = st.session_state.get("page", 1)
+is_last_page = len(items) < PAGE_SIZE
+total_pages_bottom = page if is_last_page else page + 1
+render_pagination_controls(total_pages_bottom, key_prefix="bottom")
 
 st.divider()
 st.caption("© TailorCoding — Le performance passate non garantiscono risultati futuri.")
