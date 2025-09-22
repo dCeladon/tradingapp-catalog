@@ -170,10 +170,17 @@ if not items and page > 1:
 # Stile
 st.markdown("""
 <style>
-:root { --tc-card-padding: 0.5rem; }
-.block-container { padding-top: 1rem; }
+/* Nascondi completamente la sidebar (scritte debug “manifest cols…”) */
+[data-testid="stSidebar"] { display: none !important; }
+[data-testid="stSidebarNav"] { display: none !important; }
+/* Nascondi anche il pulsante-hamburger che la riapre */
+[data-testid="collapsedControl"] { display: none !important; }
+
+/* Imposta il contenitore principale: un po’ di margine dall’alto */
+.main .block-container { padding-top: 1rem; max-width: 100%; }
 </style>
 """, unsafe_allow_html=True)
+
 
 # Render griglia
 rows = math.ceil(len(items) / COLS)
